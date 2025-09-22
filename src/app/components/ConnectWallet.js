@@ -5,20 +5,59 @@ import { ethers } from "ethers";
 export default function ConnectWallet({ setSigner, setAccount }) {
   const [connected, setConnected] = useState(false);
 
-  async function connect() {
+async function connect() {
     if (!window.ethereum) return alert("Please install MetaMask!");
     try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        const provider = new ethers.BrowserProvider(window.ethereum);
+        const signer = await provider.getSigner();
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        const network = await provider.getNetwork();
 
-      setSigner(signer);
-      setAccount(accounts[0]);
-      setConnected(true);
+        // Sepolia chainId is 11155111
+        if (network.chainId !== 11155111n) {
+            try {
+            await window.ethereum.request({
+                method: "wallet_switchEthereumChain",
+                params: [{ chainId: "0xaa36a7" }], // 0xaa36a7 is 11155111 in hex
+            });
+            // After switching, reload to update provider/signer
+            window.location.reload();
+            } catch (switchError) {
+            // This error code indicates the chain has not been added to MetaMask
+            if (switchError.code === 4902) {
+                try {
+                await window.ethereum.request({
+                    method: "wallet_addEthereumChain",
+                    params: [{
+                    chainId: "0xaa36a7",
+                    chainName: "Sepolia Testnet",
+                    nativeCurrency: {
+                        name: "SepoliaETH",
+                        symbol: "ETH",
+                        decimals: 18,
+                    },
+                    rpcUrls: ["https://rpc.sepolia.org"],
+                    blockExplorerUrls: ["https://sepolia.etherscan.io"],
+                    }],
+                });
+                window.location.reload();
+                } catch (addError) {
+                alert("Failed to add Sepolia network.");
+                }
+            } else {
+                alert("Please switch to the Sepolia testnet in MetaMask.");
+            }
+            }
+            return;
+        }
+
+        setSigner(signer);
+        setAccount(accounts[0]);
+        setConnected(true);
     } catch (err) {
-      console.error(err);
+        console.error(err);
     }
-  }
+}
 
   return (
     <button
